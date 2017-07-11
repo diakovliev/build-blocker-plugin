@@ -38,6 +38,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -255,6 +258,204 @@ public class BlockingJobsMonitorTest {
         while (!futureWorkflow.isDone()) {
             TimeUnit.SECONDS.sleep(1);
         }
+    }
+
+    private Future<FreeStyleBuild> MaintenanceSetUp() throws Exception {
+        // clear queue from preceding tests
+        Jenkins.getInstance().getQueue().clear();
+
+        // init slave
+        DumbSlave slave = j.createSlave();
+        slave.setLabelString("label");
+
+        SlaveComputer c = slave.getComputer();
+        c.connect(false).get(); // wait until it's connected
+
+        FreeStyleProject blockingProject = j.createFreeStyleProject(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME);
+        blockingProject.setAssignedLabel(new LabelAtom("label"));
+        Shell shell = new Shell("echo start maintenance; sleep 10");
+        blockingProject.getBuildersList().add(shell);
+
+        future = blockingProject.scheduleBuild2(0);
+
+        FreeStyleProject blockedProject = j.createFreeStyleProject("BLOCKED_PROJECT");
+        blockedProject.setAssignedLabel(new LabelAtom("label"));
+        Shell shell1 = new Shell("echo start blocked; sleep 10");
+        blockedProject.getBuildersList().add(shell1);
+
+        // wait until blocking job started
+        while (!slave.getComputer().getExecutors().get(0).isBusy()) {
+            TimeUnit.SECONDS.sleep(1);
+        }
+
+        return blockedProject.scheduleBuild2(0);
+    }
+
+    @Test
+    public void testMaintenanceBlockAnyOtherJobs() throws Exception {
+        Future<FreeStyleBuild> blocked = MaintenanceSetUp();
+        BlockingJobsMonitor blockingJobsMonitor = new BlockingJobsMonitor();
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNotNull(blockingJobsMonitor.checkForPlannedBuild("BLOCKED_PROJECT"));
+        assertNull(blockingJobsMonitor.checkForRunnedBuild("BLOCKED_PROJECT"));
+        assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
+        // wait until maintenance job stopped
+        while (!future.isDone()) {
+            TimeUnit.SECONDS.sleep(1);
+        }
+        assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
+        assertNull(blockingJobsMonitor.checkForPlannedBuild("BLOCKED_PROJECT"));
+        assertNotNull(blockingJobsMonitor.checkForRunnedBuild("BLOCKED_PROJECT"));
+        // wait until blocked job stopped
+        while (!blocked.isDone()) {
+            TimeUnit.SECONDS.sleep(1);
+        }
+        assertNull(blockingJobsMonitor.checkForAnyRunnedBuild());
+    }
+
+    private Future<FreeStyleBuild> MaintenanceSetUp2() throws Exception {
+        // clear queue from preceding tests
+        Jenkins.getInstance().getQueue().clear();
+
+        // init slave
+        DumbSlave slave = j.createSlave();
+        slave.setLabelString("label");
+
+        SlaveComputer c = slave.getComputer();
+        c.connect(false).get(); // wait until it's connected
+
+        FreeStyleProject blockingProject = j.createFreeStyleProject("BLOCKING_PROJECT");
+        blockingProject.setAssignedLabel(new LabelAtom("label"));
+        Shell shell = new Shell("echo start blocking; sleep 10");
+        blockingProject.getBuildersList().add(shell);
+
+        FreeStyleProject blockedProject = j.createFreeStyleProject(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME);
+        blockedProject.setAssignedLabel(new LabelAtom("label"));
+        Shell shell1 = new Shell("echo start maintenance; sleep 10");
+        blockedProject.getBuildersList().add(shell1);
+
+        future = blockingProject.scheduleBuild2(0);
+
+        // wait until blocking job started
+        while (!slave.getComputer().getExecutors().get(0).isBusy()) {
+            TimeUnit.SECONDS.sleep(1);
+        }
+
+        return blockedProject.scheduleBuild2(0);
+    }
+
+    @Test
+    public void testMaintenance2BlockAnyOtherJobs() throws Exception {
+        Future<FreeStyleBuild> blocked = MaintenanceSetUp2();
+        BlockingJobsMonitor blockingJobsMonitor = new BlockingJobsMonitor();
+        assertNull(blockingJobsMonitor.checkForPlannedBuild("BLOCKING_PROJECT"));
+        assertNotNull(blockingJobsMonitor.checkForRunnedBuild("BLOCKING_PROJECT"));
+        assertNotNull(blockingJobsMonitor.checkForPlannedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNull(blockingJobsMonitor.checkForRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
+        // wait until blocked job stopped
+        while (!future.isDone()) {
+            TimeUnit.SECONDS.sleep(1);
+        }
+        assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
+        assertNull(blockingJobsMonitor.checkForPlannedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNotNull(blockingJobsMonitor.checkForRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        // wait until blocked job stopped
+        while (!blocked.isDone()) {
+            TimeUnit.SECONDS.sleep(1);
+        }
+        assertNull(blockingJobsMonitor.checkForAnyRunnedBuild());
+    }
+
+    private List<DumbSlave> createSlaves(int count, final String label) throws Exception {
+        List<DumbSlave> result = new ArrayList<DumbSlave>();
+        for (int i = 0; i < count; ++i) {
+            DumbSlave slave = j.createSlave();
+            slave.setLabelString(label);
+            SlaveComputer c = slave.getComputer();
+            c.connect(false).get();
+            result.add(slave);
+        }
+        return result;
+    }
+
+    private FreeStyleProject createProject(final String buildName, final String assignLabel) throws IOException {
+        FreeStyleProject project = j.createFreeStyleProject(buildName);
+        project.setAssignedLabel(new LabelAtom(assignLabel));
+        Shell shell = new Shell(String.format("echo 'start %s'; sleep 10", buildName));
+        project.getBuildersList().add(shell);
+        return project;
+    }
+
+    private List<FreeStyleProject> createProjects(int count, final String baseBuildName, final String assignLabel) throws IOException {
+        List<FreeStyleProject> result = new ArrayList<FreeStyleProject>();
+        for (int i = 0; i < count; ++i) {
+            result.add(createProject(String.format("%s_%d", baseBuildName, i), assignLabel));
+        }
+        return result;
+    }
+
+    private List<Future<FreeStyleBuild>> scheduleBuilds(List<FreeStyleProject> projects) {
+        List<Future<FreeStyleBuild>> futures = new ArrayList<Future<FreeStyleBuild>>();
+        for (FreeStyleProject project: projects) {
+            futures.add(project.scheduleBuild2(0));
+        }
+        return futures;
+    }
+
+    private void waitAllForDone(List<Future<FreeStyleBuild>> futures) throws InterruptedException {
+        for (Future<FreeStyleBuild> future: futures) {
+            waitForDone(future);
+        }
+    }
+
+    private void waitForDone(Future<FreeStyleBuild> future) throws InterruptedException {
+        while (!future.isDone()) {
+            TimeUnit.SECONDS.sleep(1);
+        }
+    }
+
+    @Test
+    public void testMaintenanceSetUpExt() throws Exception {
+        Jenkins.getInstance().getQueue().clear();
+
+        List<DumbSlave> slaves = createSlaves(5, "label");
+
+        List<FreeStyleProject> projects = createProjects(5, "REGULAR_BUILD", "label");
+
+        FreeStyleProject maintenance = createProject(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME, "label");
+
+        List<Future<FreeStyleBuild>> regularBuilds = scheduleBuilds(projects);
+
+        Thread.sleep(3000);
+
+        Future<FreeStyleBuild> maintenanceBuild = maintenance.scheduleBuild2(0);
+        regularBuilds.add(maintenanceBuild);
+
+        waitAllForDone(regularBuilds);
+    }
+
+    @Test
+    public void testMaintenanceSetUpExt2() throws Exception {
+        Jenkins.getInstance().getQueue().clear();
+
+        List<DumbSlave> slaves = createSlaves(5, "label");
+
+        List<FreeStyleProject> projects = createProjects(5, "REGULAR_BUILD", "label");
+
+        FreeStyleProject maintenance = createProject(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME, "label");
+
+        Future<FreeStyleBuild> maintenanceBuild = maintenance.scheduleBuild2(0);
+
+        Thread.sleep(3000);
+
+        List<Future<FreeStyleBuild>> regularBuilds = scheduleBuilds(projects);
+
+        regularBuilds.add(maintenanceBuild);
+
+        waitAllForDone(regularBuilds);
     }
 
 }

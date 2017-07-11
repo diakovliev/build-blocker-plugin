@@ -69,6 +69,13 @@ public class BlockingJobsMonitor {
         }
     }
 
+    /**
+     * Constructor using the job configuration entry for blocking jobs
+     *
+     */
+    public BlockingJobsMonitor() {
+    }
+
     public Job checkForBuildableQueueEntries(Queue.Item item) {
         List<Queue.BuildableItem> buildableItems = Jenkins.getInstance().getQueue().getBuildableItems();
 
@@ -191,6 +198,120 @@ public class BlockingJobsMonitor {
             }
         }
         return null;
+    }
+
+    // Logic for maintenance job
+    public Job checkForAnyRunnedBuild() {
+        Computer[] computers = Jenkins.getInstance().getComputers();
+
+        for (Computer computer : computers) {
+            Job task = checkComputerForAnyRunningBuilds(computer);
+            if (task != null) {
+                return task;
+            }
+        }
+        return null;
+    }
+
+    private Job checkComputerForAnyRunningBuilds(Computer computer) {
+        List<Executor> executors = computer.getExecutors();
+
+        executors.addAll(computer.getOneOffExecutors());
+
+        for (Executor executor : executors) {
+            Job task = checkForAnyRunningBuilds(executor);
+            if (task != null) {
+                LOG.logp(FINE, getClass().getName(), "checkComputerForAnyRunningBuilds", "build blocked by running build " + task);
+                return task;
+            }
+        }
+        return null;
+    }
+
+    private Job checkForAnyRunningBuilds(Executor executor) {
+        if (executor.isBusy()) {
+            Queue.Task task = executor.getCurrentWorkUnit().work.getOwnerTask();
+
+            if (task instanceof MatrixConfiguration) {
+                task = ((MatrixConfiguration) task).getParent();
+            }
+
+            if (task instanceof Job) {
+                return (Job) task;
+            }
+        }
+        return null;
+    }
+
+    public Job checkForRunnedBuild(final String name) {
+        Computer[] computers = Jenkins.getInstance().getComputers();
+
+        for (Computer computer : computers) {
+            Job task = checkComputerForRunningBuild(computer, name);
+            if (task != null) {
+                return task;
+            }
+        }
+        return null;
+    }
+
+    private Job checkComputerForRunningBuild(Computer computer, String name) {
+        List<Executor> executors = computer.getExecutors();
+
+        executors.addAll(computer.getOneOffExecutors());
+
+        for (Executor executor : executors) {
+            Job task = checkForRunningBuild(executor, name);
+            if (task != null) {
+                LOG.logp(FINE, getClass().getName(), "checkComputerForRunningBuild", "build blocked by running build " + task);
+                return task;
+            }
+        }
+        return null;
+    }
+
+    private Job checkForRunningBuild(Executor executor, String name) {
+        if (executor.isBusy()) {
+            Queue.Task task = executor.getCurrentWorkUnit().work.getOwnerTask();
+
+            if (task instanceof MatrixConfiguration) {
+                task = ((MatrixConfiguration) task).getParent();
+            }
+
+            if (task instanceof Job) {
+                Job job = (Job) task;
+                if (job.getFullName().equals(name)) {
+                    return job;
+                }
+            }
+        }
+        return null;
+    }
+
+    public Job checkForPlannedBuild(final String name) {
+        List<Queue.Item> buildableItems = asList(Jenkins.getInstance().getQueue().getItems());
+        for (Queue.Item buildableItem : buildableItems) {
+            if (buildableItem.task instanceof Job) {
+                Job project = (Job) buildableItem.task;
+                if (project.getFullName().equals(name)) {
+                    return project;
+                }
+            }
+        }
+        return null;
+    }
+
+    public Job checkForPlannedOrRunnedBuild(final String name) {
+        Job result = checkForPlannedBuild(name);
+        if (result == null) {
+            result = checkForRunnedBuild(name);
+            if (result != null) {
+                LOG.info(String.format("Found runned build %s", result.getFullName()));
+            }
+        } else {
+            LOG.info(String.format("Found planned build %s", result.getFullName()));
+        }
+        return result;
     }
 
 }

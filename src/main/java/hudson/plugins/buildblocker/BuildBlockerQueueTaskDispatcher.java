@@ -32,7 +32,6 @@ import hudson.model.Queue;
 import hudson.model.queue.CauseOfBlockage;
 import hudson.model.queue.QueueTaskDispatcher;
 
-import javax.annotation.CheckForNull;
 import java.util.logging.Logger;
 
 import static java.util.logging.Level.FINE;
@@ -43,6 +42,8 @@ import static java.util.logging.Level.FINE;
  */
 @Extension
 public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
+
+    public static final String MAINTENANCE_JOB_NAME = "JENKINS_MAINTENANCE_JOB";
 
     private static final Logger LOG = Logger.getLogger(BuildBlockerQueueTaskDispatcher.class.getName());
 
@@ -90,29 +91,69 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
     @Override
     public CauseOfBlockage canRun(Queue.Item item) {
         if (item.task instanceof Job) {
+            CauseOfBlockage causeOfBlockage = checkForMaintenanceBlock(item);
+            if (causeOfBlockage != null) {
+                return causeOfBlockage;
+            }
             BuildBlockerProperty property = getBuildBlockerProperty(item);
-
-            if (property != null && property.isUseBuildBlocker()) {
-                CauseOfBlockage Job = checkForBlock(item, property);
-                if (Job != null) {
-                    return Job;
+            if (property != null) {
+                causeOfBlockage = checkForBlock(item, property);
+                if (causeOfBlockage != null) {
+                    return causeOfBlockage;
                 }
             }
         }
-
         return super.canRun(item);
     }
 
     @Override
     public CauseOfBlockage canTake(Node node, Queue.BuildableItem item) {
+        CauseOfBlockage causeOfBlockage = checkForMaintenanceBlock(node, item);
+        if (causeOfBlockage != null) {
+            return causeOfBlockage;
+        }
         BuildBlockerProperty property = getBuildBlockerProperty(item);
-        if (property != null && property.isUseBuildBlocker()) {
-            CauseOfBlockage causeOfBlockage = checkForBlock(node, item, property);
+        if (property != null) {
+            causeOfBlockage = checkForBlock(node, item, property);
             if (causeOfBlockage != null) {
                 return causeOfBlockage;
             }
         }
         return super.canTake(node, item);
+    }
+
+    private CauseOfBlockage checkForMaintenanceBlock(Queue.Item item) {
+        return checkForMaintenanceBlock(null, item);
+    }
+
+    private CauseOfBlockage checkForMaintenanceBlock(Node node, Queue.Item item) {
+        if (item.task != null && item.task instanceof Job) {
+            BlockingJobsMonitor jobsMonitor = monitorFactory.build();
+            Job job = (Job)item.task;
+            Job result;
+            if (job.getFullName() != null && job.getFullName().equals(MAINTENANCE_JOB_NAME)) {
+                // Maintenance job can run only if there are no any runned builds
+                result = jobsMonitor.checkForAnyRunnedBuild();
+                if (result != null) {
+                    LOG.info(String.format("Maintenance %s blocked by %s", job.getFullName(), result.getFullName()));
+                }
+            } else {
+                // Other jobs will be run only if MAINTENANCE_JOB_NAME not sheduled/runned
+                result = jobsMonitor.checkForPlannedOrRunnedBuild(MAINTENANCE_JOB_NAME);
+                if (result != null) {
+                    LOG.info(String.format("Regular %s blocked by %s", job.getFullName(), result.getFullName()));
+                }
+            }
+            if (result != null) {
+                if (result instanceof MatrixConfiguration) {
+                    result = ((MatrixConfiguration) result).getParent();
+                }
+                LOG.info(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()).toString());
+                return CauseOfBlockage.fromMessage(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()));
+            }
+            LOG.info(String.format("Allow %s", job.getFullName()));
+        }
+        return null;
     }
 
     private CauseOfBlockage checkForBlock(Queue.Item item, BuildBlockerProperty blockingJobs) {
@@ -131,7 +172,7 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
             if (result instanceof MatrixConfiguration) {
                 result = ((MatrixConfiguration) result).getParent();
             }
-
+            LOG.info(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()).toString());
             return CauseOfBlockage.fromMessage(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()));
         }
         return null;
@@ -195,13 +236,18 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
         return result != null;
     }
 
-    @CheckForNull
+    //@CheckForNull
     private BuildBlockerProperty getBuildBlockerProperty(Queue.Item item) {
         if (!(item.task instanceof Job)) {
             return null;
         }
         Job<?,?> job = (Job<?,?>) item.task;
 
-        return job.getProperty(BuildBlockerProperty.class);
+        BuildBlockerProperty property = job.getProperty(BuildBlockerProperty.class);
+        if (property != null && !property.isUseBuildBlocker()) {
+            return null;
+        }
+
+        return property;
     }
 }
