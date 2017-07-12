@@ -130,28 +130,28 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
             BlockingJobsMonitor jobsMonitor = monitorFactory.build();
             Job job = (Job)item.task;
             if (job instanceof MatrixConfiguration) {
-                // allow to run matrix configuration if parent build runned
+                // Allow to run matrix configuration if parent build run
                 Job parent = ((MatrixConfiguration)job).getParent();
                 if (parent.isBuilding()) {
-                    LOG.info(String.format("MatrixConfiguration detected, allow %s", parent.getFullName()));
+                    LOG.info(String.format("MatrixConfiguration detected, allow job: %s parent: %s", job.getFullName(), parent.getFullName()));
                     return null;
                 }
             }
             Job result;
             if (job.getFullName() != null && globalConfig.isMaintenanceJob(job.getFullName())) {
-                // Another runned maintenance job will block maintenance
+                // Another run of maintenance job will block maintenance
                 result = jobsMonitor.checkForRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {
-                    LOG.info(String.format("Maitenance %s blocked by runned maintenance %s", job.getFullName(), result.getFullName()));
+                    LOG.info(String.format("Maintenance %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
                 } else {
-                    // Maintenance job can run only if there are no any runned builds
+                    // Maintenance job can run only if there are no any run builds
                     result = jobsMonitor.checkForAnyRunnedBuild();
                     if (result != null) {
                         LOG.info(String.format("Maintenance %s blocked by %s", job.getFullName(), result.getFullName()));
                     }
                 }
             } else {
-                // All other jobs will be run only if no sheduled/runned maitenance
+                // All other jobs will be run only if there are no scheduled/run maintenance builds
                 result = jobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {
                     LOG.info(String.format("Regular %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
