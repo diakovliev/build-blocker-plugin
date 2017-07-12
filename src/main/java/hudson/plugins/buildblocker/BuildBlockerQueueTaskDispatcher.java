@@ -129,6 +129,14 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
         if (globalConfig != null && globalConfig.isMaintenanceJobEnabled() && item.task != null && item.task instanceof Job) {
             BlockingJobsMonitor jobsMonitor = monitorFactory.build();
             Job job = (Job)item.task;
+            if (job instanceof MatrixConfiguration) {
+                // allow to run matrix configuration if parent build runned
+                Job parent = ((MatrixConfiguration)job).getParent();
+                if (parent.isBuilding()) {
+                    LOG.info(String.format("MatrixConfiguration detected, allow %s", parent.getFullName()));
+                    return null;
+                }
+            }
             Job result;
             if (job.getFullName() != null && globalConfig.isMaintenanceJob(job.getFullName())) {
                 // Another runned maintenance job will block maintenance
