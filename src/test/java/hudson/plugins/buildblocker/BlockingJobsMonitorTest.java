@@ -59,6 +59,8 @@ public class BlockingJobsMonitorTest {
     private Future<FreeStyleBuild> future;
     private Future<WorkflowRun> futureWorkflow;
 
+    private BuildBlockerGlobalConfiguration globalConfig;
+
     protected void FreeStyleSetUp() throws Exception {
         blockingJobName = "blockingJob";
 
@@ -260,9 +262,18 @@ public class BlockingJobsMonitorTest {
         }
     }
 
+    private void setupMaintenanceConfig() {
+        globalConfig = BuildBlockerGlobalConfiguration.get();
+        globalConfig.setMaintenanceJobEnabled(true);
+        globalConfig.setMaintenanceJobName("JENKINS_MAINTENANCE_JOB");
+        globalConfig.save();
+    }
+
     private Future<FreeStyleBuild> MaintenanceSetUp() throws Exception {
         // clear queue from preceding tests
         Jenkins.getInstance().getQueue().clear();
+
+        setupMaintenanceConfig();
 
         // init slave
         DumbSlave slave = j.createSlave();
@@ -271,7 +282,7 @@ public class BlockingJobsMonitorTest {
         SlaveComputer c = slave.getComputer();
         c.connect(false).get(); // wait until it's connected
 
-        FreeStyleProject blockingProject = j.createFreeStyleProject(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME);
+        FreeStyleProject blockingProject = j.createFreeStyleProject(globalConfig.getMaintenanceJobName());
         blockingProject.setAssignedLabel(new LabelAtom("label"));
         Shell shell = new Shell("echo start maintenance; sleep 10");
         blockingProject.getBuildersList().add(shell);
@@ -295,7 +306,7 @@ public class BlockingJobsMonitorTest {
     public void testMaintenanceBlockAnyOtherJobs() throws Exception {
         Future<FreeStyleBuild> blocked = MaintenanceSetUp();
         BlockingJobsMonitor blockingJobsMonitor = new BlockingJobsMonitor();
-        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(globalConfig.getMaintenanceJobName()));
         assertNotNull(blockingJobsMonitor.checkForPlannedBuild("BLOCKED_PROJECT"));
         assertNull(blockingJobsMonitor.checkForRunnedBuild("BLOCKED_PROJECT"));
         assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
@@ -317,6 +328,8 @@ public class BlockingJobsMonitorTest {
         // clear queue from preceding tests
         Jenkins.getInstance().getQueue().clear();
 
+        setupMaintenanceConfig();
+
         // init slave
         DumbSlave slave = j.createSlave();
         slave.setLabelString("label");
@@ -329,7 +342,7 @@ public class BlockingJobsMonitorTest {
         Shell shell = new Shell("echo start blocking; sleep 10");
         blockingProject.getBuildersList().add(shell);
 
-        FreeStyleProject blockedProject = j.createFreeStyleProject(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME);
+        FreeStyleProject blockedProject = j.createFreeStyleProject(globalConfig.getMaintenanceJobName());
         blockedProject.setAssignedLabel(new LabelAtom("label"));
         Shell shell1 = new Shell("echo start maintenance; sleep 10");
         blockedProject.getBuildersList().add(shell1);
@@ -350,18 +363,18 @@ public class BlockingJobsMonitorTest {
         BlockingJobsMonitor blockingJobsMonitor = new BlockingJobsMonitor();
         assertNull(blockingJobsMonitor.checkForPlannedBuild("BLOCKING_PROJECT"));
         assertNotNull(blockingJobsMonitor.checkForRunnedBuild("BLOCKING_PROJECT"));
-        assertNotNull(blockingJobsMonitor.checkForPlannedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
-        assertNull(blockingJobsMonitor.checkForRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
-        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNotNull(blockingJobsMonitor.checkForPlannedBuild(globalConfig.getMaintenanceJobName()));
+        assertNull(blockingJobsMonitor.checkForRunnedBuild(globalConfig.getMaintenanceJobName()));
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(globalConfig.getMaintenanceJobName()));
         assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
         // wait until blocked job stopped
         while (!future.isDone()) {
             TimeUnit.SECONDS.sleep(1);
         }
         assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
-        assertNull(blockingJobsMonitor.checkForPlannedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
-        assertNotNull(blockingJobsMonitor.checkForRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
-        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME));
+        assertNull(blockingJobsMonitor.checkForPlannedBuild(globalConfig.getMaintenanceJobName()));
+        assertNotNull(blockingJobsMonitor.checkForRunnedBuild(globalConfig.getMaintenanceJobName()));
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(globalConfig.getMaintenanceJobName()));
         // wait until blocked job stopped
         while (!blocked.isDone()) {
             TimeUnit.SECONDS.sleep(1);
@@ -421,15 +434,17 @@ public class BlockingJobsMonitorTest {
     public void testMaintenanceSetUpExt() throws Exception {
         Jenkins.getInstance().getQueue().clear();
 
+        setupMaintenanceConfig();
+
         List<DumbSlave> slaves = createSlaves(5, "label");
 
         List<FreeStyleProject> projects = createProjects(5, "REGULAR_BUILD", "label");
 
-        FreeStyleProject maintenance = createProject(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME, "label");
+        FreeStyleProject maintenance = createProject(globalConfig.getMaintenanceJobName(), "label");
 
         List<Future<FreeStyleBuild>> regularBuilds = scheduleBuilds(projects);
 
-        Thread.sleep(3000);
+        TimeUnit.SECONDS.sleep(3);
 
         Future<FreeStyleBuild> maintenanceBuild = maintenance.scheduleBuild2(0);
         regularBuilds.add(maintenanceBuild);
@@ -441,15 +456,17 @@ public class BlockingJobsMonitorTest {
     public void testMaintenanceSetUpExt2() throws Exception {
         Jenkins.getInstance().getQueue().clear();
 
+        setupMaintenanceConfig();
+
         List<DumbSlave> slaves = createSlaves(5, "label");
 
         List<FreeStyleProject> projects = createProjects(5, "REGULAR_BUILD", "label");
 
-        FreeStyleProject maintenance = createProject(BuildBlockerQueueTaskDispatcher.MAINTENANCE_JOB_NAME, "label");
+        FreeStyleProject maintenance = createProject(globalConfig.getMaintenanceJobName(), "label");
 
         Future<FreeStyleBuild> maintenanceBuild = maintenance.scheduleBuild2(0);
 
-        Thread.sleep(3000);
+        TimeUnit.SECONDS.sleep(3);
 
         List<Future<FreeStyleBuild>> regularBuilds = scheduleBuilds(projects);
 

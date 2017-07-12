@@ -43,8 +43,6 @@ import static java.util.logging.Level.FINE;
 @Extension
 public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
 
-    public static final String MAINTENANCE_JOB_NAME = "JENKINS_MAINTENANCE_JOB";
-
     private static final Logger LOG = Logger.getLogger(BuildBlockerQueueTaskDispatcher.class.getName());
 
     private MonitorFactory monitorFactory;
@@ -127,11 +125,12 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
     }
 
     private CauseOfBlockage checkForMaintenanceBlock(Node node, Queue.Item item) {
-        if (item.task != null && item.task instanceof Job) {
+        BuildBlockerGlobalConfiguration config = BuildBlockerGlobalConfiguration.get();
+        if (config != null && config.isMaintenanceJobEnabled() && item.task != null && item.task instanceof Job) {
             BlockingJobsMonitor jobsMonitor = monitorFactory.build();
             Job job = (Job)item.task;
             Job result;
-            if (job.getFullName() != null && job.getFullName().equals(MAINTENANCE_JOB_NAME)) {
+            if (job.getFullName() != null && job.getFullName().equals(config.getMaintenanceJobName())) {
                 // Maintenance job can run only if there are no any runned builds
                 result = jobsMonitor.checkForAnyRunnedBuild();
                 if (result != null) {
@@ -139,9 +138,9 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
                 }
             } else {
                 // Other jobs will be run only if MAINTENANCE_JOB_NAME not sheduled/runned
-                result = jobsMonitor.checkForPlannedOrRunnedBuild(MAINTENANCE_JOB_NAME);
+                result = jobsMonitor.checkForPlannedOrRunnedBuild(config.getMaintenanceJobName());
                 if (result != null) {
-                    LOG.info(String.format("Regular %s blocked by %s", job.getFullName(), result.getFullName()));
+                    LOG.info(String.format("Regular %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
                 }
             }
             if (result != null) {
