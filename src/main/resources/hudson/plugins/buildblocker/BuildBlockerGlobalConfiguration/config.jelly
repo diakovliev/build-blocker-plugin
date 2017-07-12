@@ -2,7 +2,7 @@
     <f:section title="Build blocker plugin">
         <f:optionalBlock name="maintenanceJobEnabled" title="Enable maintenance job feature"
                          checked="${instance.maintenanceJobEnabled}" inline="true" field="maintenanceJobEnabled">
-            <f:entry title="Maintenance job name" description="Maintenance job name" field="maintenanceJobName">
+            <f:entry title="Maintenance job name" description="Java regexp to determine maintenance job" field="maintenanceJobName">
                 <f:textbox />
             </f:entry>
         </f:optionalBlock>

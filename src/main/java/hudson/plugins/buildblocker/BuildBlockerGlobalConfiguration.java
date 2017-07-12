@@ -54,4 +54,7 @@ public class BuildBlockerGlobalConfiguration extends GlobalConfiguration {
         return GlobalConfiguration.all().get(BuildBlockerGlobalConfiguration.class);
     }
 
+    public boolean isMaintenanceJob(final String jobNameToTest) {
+        return jobNameToTest.matches(maintenanceJobName);
+    }
 }

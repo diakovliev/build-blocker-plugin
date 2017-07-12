@@ -306,17 +306,13 @@ public class BlockingJobsMonitorTest {
     public void testMaintenanceBlockAnyOtherJobs() throws Exception {
         Future<FreeStyleBuild> blocked = MaintenanceSetUp();
         BlockingJobsMonitor blockingJobsMonitor = new BlockingJobsMonitor();
-        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(globalConfig.getMaintenanceJobName()));
-        assertNotNull(blockingJobsMonitor.checkForPlannedBuild("BLOCKED_PROJECT"));
-        assertNull(blockingJobsMonitor.checkForRunnedBuild("BLOCKED_PROJECT"));
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig));
         assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
         // wait until maintenance job stopped
         while (!future.isDone()) {
             TimeUnit.SECONDS.sleep(1);
         }
         assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
-        assertNull(blockingJobsMonitor.checkForPlannedBuild("BLOCKED_PROJECT"));
-        assertNotNull(blockingJobsMonitor.checkForRunnedBuild("BLOCKED_PROJECT"));
         // wait until blocked job stopped
         while (!blocked.isDone()) {
             TimeUnit.SECONDS.sleep(1);
@@ -361,20 +357,18 @@ public class BlockingJobsMonitorTest {
     public void testMaintenance2BlockAnyOtherJobs() throws Exception {
         Future<FreeStyleBuild> blocked = MaintenanceSetUp2();
         BlockingJobsMonitor blockingJobsMonitor = new BlockingJobsMonitor();
-        assertNull(blockingJobsMonitor.checkForPlannedBuild("BLOCKING_PROJECT"));
-        assertNotNull(blockingJobsMonitor.checkForRunnedBuild("BLOCKING_PROJECT"));
-        assertNotNull(blockingJobsMonitor.checkForPlannedBuild(globalConfig.getMaintenanceJobName()));
-        assertNull(blockingJobsMonitor.checkForRunnedBuild(globalConfig.getMaintenanceJobName()));
-        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(globalConfig.getMaintenanceJobName()));
+        assertNotNull(blockingJobsMonitor.checkForPlannedMaintenanceBuild(globalConfig));
+        assertNull(blockingJobsMonitor.checkForRunnedMaintenanceBuild(globalConfig));
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig));
         assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
         // wait until blocked job stopped
         while (!future.isDone()) {
             TimeUnit.SECONDS.sleep(1);
         }
         assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
-        assertNull(blockingJobsMonitor.checkForPlannedBuild(globalConfig.getMaintenanceJobName()));
-        assertNotNull(blockingJobsMonitor.checkForRunnedBuild(globalConfig.getMaintenanceJobName()));
-        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedBuild(globalConfig.getMaintenanceJobName()));
+        assertNull(blockingJobsMonitor.checkForPlannedMaintenanceBuild(globalConfig));
+        assertNotNull(blockingJobsMonitor.checkForRunnedMaintenanceBuild(globalConfig));
+        assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig));
         // wait until blocked job stopped
         while (!blocked.isDone()) {
             TimeUnit.SECONDS.sleep(1);

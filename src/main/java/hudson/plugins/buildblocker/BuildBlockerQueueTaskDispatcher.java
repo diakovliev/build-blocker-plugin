@@ -125,20 +125,26 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
     }
 
     private CauseOfBlockage checkForMaintenanceBlock(Node node, Queue.Item item) {
-        BuildBlockerGlobalConfiguration config = BuildBlockerGlobalConfiguration.get();
-        if (config != null && config.isMaintenanceJobEnabled() && item.task != null && item.task instanceof Job) {
+        BuildBlockerGlobalConfiguration globalConfig = BuildBlockerGlobalConfiguration.get();
+        if (globalConfig != null && globalConfig.isMaintenanceJobEnabled() && item.task != null && item.task instanceof Job) {
             BlockingJobsMonitor jobsMonitor = monitorFactory.build();
             Job job = (Job)item.task;
             Job result;
-            if (job.getFullName() != null && job.getFullName().equals(config.getMaintenanceJobName())) {
-                // Maintenance job can run only if there are no any runned builds
-                result = jobsMonitor.checkForAnyRunnedBuild();
+            if (job.getFullName() != null && globalConfig.isMaintenanceJob(job.getFullName())) {
+                // Another runned maintenance job will block maintenance
+                result = jobsMonitor.checkForRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {
-                    LOG.info(String.format("Maintenance %s blocked by %s", job.getFullName(), result.getFullName()));
+                    LOG.info(String.format("Maitenance %s blocked by runned maintenance %s", job.getFullName(), result.getFullName()));
+                } else {
+                    // Maintenance job can run only if there are no any runned builds
+                    result = jobsMonitor.checkForAnyRunnedBuild();
+                    if (result != null) {
+                        LOG.info(String.format("Maintenance %s blocked by %s", job.getFullName(), result.getFullName()));
+                    }
                 }
             } else {
-                // Other jobs will be run only if MAINTENANCE_JOB_NAME not sheduled/runned
-                result = jobsMonitor.checkForPlannedOrRunnedBuild(config.getMaintenanceJobName());
+                // All other jobs will be run only if no sheduled/runned maitenance
+                result = jobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {
                     LOG.info(String.format("Regular %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
                 }
