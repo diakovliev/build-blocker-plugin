@@ -2,6 +2,7 @@
  * The MIT License
  *
  * Copyright (c) 2004-2011, Sun Microsystems, Inc., Frederik Fromm
+ * Copyright (C) 2017 Zodiac Interactive, LCC, Dmytro Iakovliev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -57,7 +58,6 @@ public class BlockingJobsMonitor {
 
     private static final Logger LOG = Logger.getLogger(BlockingJobsMonitor.class.getName());
 
-
     /**
      * Constructor using the job configuration entry for blocking jobs
      *
@@ -67,13 +67,6 @@ public class BlockingJobsMonitor {
         if (StringUtils.isNotBlank(blockingJobs)) {
             this.blockingJobs = asList(blockingJobs.split("\n"));
         }
-    }
-
-    /**
-     * Constructor using the job configuration entry for blocking jobs
-     *
-     */
-    public BlockingJobsMonitor() {
     }
 
     public Job checkForBuildableQueueEntries(Queue.Item item) {
@@ -198,120 +191,6 @@ public class BlockingJobsMonitor {
             }
         }
         return null;
-    }
-
-    // Logic for maintenance job
-    public Job checkForAnyRunnedBuild() {
-        Computer[] computers = Jenkins.getInstance().getComputers();
-
-        for (Computer computer : computers) {
-            Job task = checkComputerForAnyRunningBuilds(computer);
-            if (task != null) {
-                return task;
-            }
-        }
-        return null;
-    }
-
-    private Job checkComputerForAnyRunningBuilds(Computer computer) {
-        List<Executor> executors = computer.getExecutors();
-
-        executors.addAll(computer.getOneOffExecutors());
-
-        for (Executor executor : executors) {
-            Job task = checkForAnyRunningBuilds(executor);
-            if (task != null) {
-                LOG.logp(FINE, getClass().getName(), "checkComputerForAnyRunningBuilds", "build blocked by running build " + task);
-                return task;
-            }
-        }
-        return null;
-    }
-
-    private Job checkForAnyRunningBuilds(Executor executor) {
-        if (executor.isBusy()) {
-            Queue.Task task = executor.getCurrentWorkUnit().work.getOwnerTask();
-
-            if (task instanceof MatrixConfiguration) {
-                task = ((MatrixConfiguration) task).getParent();
-            }
-
-            if (task instanceof Job) {
-                return (Job) task;
-            }
-        }
-        return null;
-    }
-
-    public Job checkForRunnedMaintenanceBuild(BuildBlockerGlobalConfiguration config) {
-        Computer[] computers = Jenkins.getInstance().getComputers();
-
-        for (Computer computer : computers) {
-            Job task = checkComputerForRunningMaintenanceBuild(computer, config);
-            if (task != null) {
-                return task;
-            }
-        }
-        return null;
-    }
-
-    private Job checkComputerForRunningMaintenanceBuild(Computer computer, BuildBlockerGlobalConfiguration config) {
-        List<Executor> executors = computer.getExecutors();
-
-        executors.addAll(computer.getOneOffExecutors());
-
-        for (Executor executor : executors) {
-            Job task = checkForRunningMaintenanceBuild(executor, config);
-            if (task != null) {
-                LOG.logp(FINE, getClass().getName(), "checkComputerForRunningBuild", "build blocked by running build " + task);
-                return task;
-            }
-        }
-        return null;
-    }
-
-    private Job checkForRunningMaintenanceBuild(Executor executor, BuildBlockerGlobalConfiguration config) {
-        if (executor.isBusy()) {
-            Queue.Task task = executor.getCurrentWorkUnit().work.getOwnerTask();
-
-            if (task instanceof MatrixConfiguration) {
-                task = ((MatrixConfiguration) task).getParent();
-            }
-
-            if (task instanceof Job) {
-                Job job = (Job) task;
-                if (config.isMaintenanceJob(job.getFullName())) {
-                    return job;
-                }
-            }
-        }
-        return null;
-    }
-
-    public Job checkForPlannedMaintenanceBuild(BuildBlockerGlobalConfiguration config) {
-        List<Queue.Item> buildableItems = asList(Jenkins.getInstance().getQueue().getItems());
-        for (Queue.Item buildableItem : buildableItems) {
-            if (buildableItem.task instanceof Job) {
-                Job project = (Job) buildableItem.task;
-                if (config.isMaintenanceJob(project.getFullName())) {
-                    return project;
-                }
-            }
-        }
-        return null;
-    }
-
-    public Job checkForPlannedOrRunnedMaintenanceBuild(BuildBlockerGlobalConfiguration config) {
-        Job result = checkForPlannedMaintenanceBuild(config);
-        if (result == null) {
-            result = checkForRunnedMaintenanceBuild(config);
-            if (result != null) {
-                LOG.info(String.format("Found runned build %s", result.getFullName()));
-            }
-        } else {
-            LOG.info(String.format("Found planned build %s", result.getFullName()));
-        }
-        return result;
     }
 
 }

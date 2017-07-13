@@ -2,6 +2,7 @@
  * The MIT License
  *
  * Copyright (c) 2004-2011, Sun Microsystems, Inc., Frederik Fromm
+ * Copyright (C) 2017 Zodiac Interactive, LCC, Dmytro Iakovliev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -127,7 +128,7 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
     private CauseOfBlockage checkForMaintenanceBlock(Node node, Queue.Item item) {
         BuildBlockerGlobalConfiguration globalConfig = BuildBlockerGlobalConfiguration.get();
         if (globalConfig != null && globalConfig.isMaintenanceJobEnabled() && item.task != null && item.task instanceof Job) {
-            BlockingJobsMonitor jobsMonitor = monitorFactory.build();
+            MaintenanceBlockingJobMonitor jobsMonitor = new MaintenanceBlockingJobMonitor();
             Job job = (Job)item.task;
             if (job instanceof MatrixConfiguration) {
                 // Allow to run matrix configuration if parent build run
@@ -151,6 +152,12 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
                     }
                 }
             } else {
+                // If any multijob is runned, we can't do maintenance block
+                result = jobsMonitor.checkForAnyRunnedMultijob();
+                if (result != null) {
+                    LOG.info(String.format("Run Multijob %s is detected, do not do maintenance block", result.getFullName()));
+                    return null;
+                }
                 // All other jobs will be run only if there are no scheduled/run maintenance builds
                 result = jobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {

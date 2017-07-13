@@ -22,7 +22,6 @@ import static org.mockito.Mockito.when;
 import static org.powermock.api.support.membermodification.MemberMatcher.field;
 
 // dmytro.iakovliev: Disable these tests becausa was changed BlockingJobsMonitor usage logic.
-@Ignore
 @PrepareForTest({Queue.BuildableItem.class, Project.class})
 @RunWith(PowerMockRunner.class)
 public class BuildBlockerQueueTaskDispatcherUnitTest {
@@ -514,11 +513,6 @@ public class BuildBlockerQueueTaskDispatcherUnitTest {
 
         @Override
         public BlockingJobsMonitor build(String blockingJobs) {
-            return monitor;
-        }
-
-        @Override
-        public BlockingJobsMonitor build() {
             return monitor;
         }
 

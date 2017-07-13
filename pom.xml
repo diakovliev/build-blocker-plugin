@@ -4,6 +4,7 @@
   The MIT License
 
   Copyright (c) 2011, Frederik Fromm
+  Copyright (C) 2017 Zodiac Interactive, LCC, Dmytro Iakovliev
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +35,7 @@
 
     <artifactId>build-blocker-plugin</artifactId>
     <name>Build Blocker Plugin</name>
-    <version>1.7.4.1-zodiac</version>
+    <version>1.7.4.2-zodiac</version>
     <packaging>hpi</packaging>
     <url>https://wiki.jenkins-ci.org/display/JENKINS/Build+Blocker+Plugin</url>
 
@@ -150,6 +151,16 @@
             <groupId>org.jenkins-ci.plugins</groupId>
             <artifactId>matrix-project</artifactId>
             <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>jenkins-multijob-plugin</artifactId>
+            <version>1.21</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>copyartifact</artifactId>
+            <version>1.32.1</version>
         </dependency>
         <dependency>
             <groupId>org.jenkins-ci.plugins.workflow</groupId>

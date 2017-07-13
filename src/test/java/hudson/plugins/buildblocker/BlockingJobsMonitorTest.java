@@ -2,6 +2,7 @@
  * The MIT License
  *
  * Copyright (c) 2004-2011, Sun Microsystems, Inc., Frederik Fromm
+ * Copyright (C) 2017 Zodiac Interactive, LCC, Dmytro Iakovliev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -305,7 +306,7 @@ public class BlockingJobsMonitorTest {
     @Test
     public void testMaintenanceBlockAnyOtherJobs() throws Exception {
         Future<FreeStyleBuild> blocked = MaintenanceSetUp();
-        BlockingJobsMonitor blockingJobsMonitor = new BlockingJobsMonitor();
+        MaintenanceBlockingJobMonitor blockingJobsMonitor = new MaintenanceBlockingJobMonitor();
         assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig));
         assertNotNull(blockingJobsMonitor.checkForAnyRunnedBuild());
         // wait until maintenance job stopped
@@ -356,7 +357,7 @@ public class BlockingJobsMonitorTest {
     @Test
     public void testMaintenance2BlockAnyOtherJobs() throws Exception {
         Future<FreeStyleBuild> blocked = MaintenanceSetUp2();
-        BlockingJobsMonitor blockingJobsMonitor = new BlockingJobsMonitor();
+        MaintenanceBlockingJobMonitor blockingJobsMonitor = new MaintenanceBlockingJobMonitor();
         assertNotNull(blockingJobsMonitor.checkForPlannedMaintenanceBuild(globalConfig));
         assertNull(blockingJobsMonitor.checkForRunnedMaintenanceBuild(globalConfig));
         assertNotNull(blockingJobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig));
