@@ -25,8 +25,11 @@
 package hudson.plugins.buildblocker;
 
 import com.tikal.jenkins.plugins.multijob.MultiJobProject;
+import hudson.model.AbstractProject;
 import hudson.model.Job;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Logger;
 
 public class MaintenanceBlockingJobMonitor {
@@ -43,6 +46,7 @@ public class MaintenanceBlockingJobMonitor {
         return jobFinder.findFirstRunBuild(new JobFinder.JobAcceptor() {
             @Override
             public boolean accept(Job job) {
+                LOG.info(String.format("checkForRunnedMaintenanceBuild: Check %s for matching %s", job.getFullName(), config.getMaintenanceJobName()));
                 return config.isMaintenanceJob(job.getFullName());
             }
         });
@@ -52,6 +56,7 @@ public class MaintenanceBlockingJobMonitor {
         return jobFinder.findFirstPlannedBuild(new JobFinder.JobAcceptor() {
             @Override
             public boolean accept(Job job) {
+                LOG.info(String.format("checkForPlannedMaintenanceBuild: Check %s for matching %s", job.getFullName(), config.getMaintenanceJobName()));
                 return config.isMaintenanceJob(job.getFullName());
             }
         });
@@ -60,9 +65,12 @@ public class MaintenanceBlockingJobMonitor {
     public Job checkForPlannedOrRunnedMaintenanceBuild(final BuildBlockerGlobalConfiguration config) {
         Job result = checkForPlannedMaintenanceBuild(config);
         if (result == null) {
+            LOG.info(String.format("No planned build for regexp %s", config.getMaintenanceJobName()));
             result = checkForRunnedMaintenanceBuild(config);
             if (result != null) {
-                LOG.info(String.format("Found runned build %s", result.getFullName()));
+                LOG.info(String.format("Found run build %s", result.getFullName()));
+            } else {
+                LOG.info(String.format("No run build for regexp %s", config.getMaintenanceJobName()));
             }
         } else {
             LOG.info(String.format("Found planned build %s", result.getFullName()));
@@ -74,13 +82,45 @@ public class MaintenanceBlockingJobMonitor {
         return jobFinder.findFirstRunBuild(null);
     }
 
-    public Job checkForAnyRunnedMultijob() {
-        return jobFinder.findFirstRunBuild(new JobFinder.JobAcceptor() {
+    public boolean isPartOfRunnedMultijob(Job job) {
+        boolean result = false;
+        if (job instanceof AbstractProject) {
+            List<MultiJobProject> runnedMultijobs = getAllRunnedMultijobs();
+            for (MultiJobProject project: runnedMultijobs) {
+                result = isPartOfMultijob(project, (AbstractProject) job);
+                if (result) break;
+            }
+        }
+        return result;
+    }
+
+    private boolean isPartOfMultijob(MultiJobProject multiJobProject, AbstractProject project) {
+        boolean result;
+        List<AbstractProject> subjobs = multiJobProject.getDownstreamProjects();
+        result = subjobs.contains(project);
+        if (!result) {
+            for (Job subjob: subjobs) {
+                if (subjob instanceof MultiJobProject) {
+                    result = isPartOfMultijob((MultiJobProject)subjob, project);
+                    if (result) break;
+                }
+            }
+        }
+        return result;
+    }
+
+    private List<MultiJobProject> getAllRunnedMultijobs() {
+        List<MultiJobProject> result = new ArrayList<MultiJobProject>();
+        List<Job> jobs = jobFinder.findAllRunBuilds(new JobFinder.JobAcceptor() {
             @Override
             public boolean accept(Job job) {
                 return job instanceof MultiJobProject;
             }
         });
+        for (Job job: jobs) {
+            result.add((MultiJobProject)job);
+        }
+        return result;
     }
 
 }

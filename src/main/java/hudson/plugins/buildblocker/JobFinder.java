@@ -31,51 +31,114 @@ import hudson.model.Job;
 import hudson.model.Queue;
 import jenkins.model.Jenkins;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 import static java.util.Arrays.asList;
 
 public class JobFinder {
 
+    private static final Logger LOG = Logger.getLogger(JobFinder.class.getName());
+
     public interface JobAcceptor {
         boolean accept(Job job);
     }
 
-    public Job findFirstPlannedBuild(JobAcceptor acceptor) {
-        List<Queue.Item> buildableItems = asList(Jenkins.getInstance().getQueue().getItems());
+    public List<Job> findAllPlannedBuilds(JobAcceptor acceptor) {
+        List<Job> result = new ArrayList<Job>();
+        List<? extends Queue.Item> buildableItems = asList(Jenkins.getInstance().getQueue().getItems());
         for (Queue.Item buildableItem : buildableItems) {
             if (buildableItem.task instanceof Job) {
-                Job project = (Job) buildableItem.task;
+                LOG.info("Queue item task is Job");
+                Job job = (Job) buildableItem.task;
                 if (acceptor != null) {
-                    if (acceptor.accept(project)) {
-                        return project;
+                    LOG.info("Acceptor found");
+                    if (acceptor.accept(job)) {
+                        LOG.info(String.format("Accept %s", job.getDisplayName()));
+                        result.add(job);
+                    } else {
+                        LOG.info(String.format("Not accepted %s", job.getDisplayName()));
                     }
                 } else {
-                    return project;
+                    LOG.info(String.format("No acceptor, accept %s", job.getDisplayName()));
+                    result.add(job);
                 }
+            } else {
+                LOG.info(String.format("Queue item task is not Job. %s", buildableItem.getDisplayName()));
+            }
+        }
+        return result;
+    }
+
+    public Job findFirstPlannedBuild(JobAcceptor acceptor) {
+        List<? extends Queue.Item> buildableItems = asList(Jenkins.getInstance().getQueue().getItems());
+        for (Queue.Item buildableItem : buildableItems) {
+            if (buildableItem.task instanceof Job) {
+                LOG.info("Queue item task is Job");
+                Job job = (Job) buildableItem.task;
+                if (acceptor != null) {
+                    LOG.info("Acceptor found");
+                    if (acceptor.accept(job)) {
+                        LOG.info(String.format("Accept %s", job.getDisplayName()));
+                        return job;
+                    } else {
+                        LOG.info(String.format("Not accepted %s", job.getDisplayName()));
+                    }
+                } else {
+                    LOG.info(String.format("No acceptor, accept %s", job.getDisplayName()));
+                    return job;
+                }
+            } else {
+                LOG.info(String.format("Queue item task is not Job. %s", buildableItem.getDisplayName()));
             }
         }
         return null;
+    }
+
+    public List<Job> findAllRunBuilds(JobAcceptor acceptor) {
+        List<Job> result = new ArrayList<Job>();
+        Computer[] computers = Jenkins.getInstance().getComputers();
+        for (Computer computer : computers) {
+            List<Job> tasks = findComputerAllRunBuilds(computer, acceptor);
+            if (!tasks.isEmpty()) {
+                result.addAll(tasks);
+            }
+        }
+        return result;
     }
 
     public Job findFirstRunBuild(JobAcceptor acceptor) {
         Computer[] computers = Jenkins.getInstance().getComputers();
         for (Computer computer : computers) {
-            Job task = findComputerRunBuild(computer, acceptor);
-            if (task != null) {
-                return task;
+            Job job = findComputerRunBuild(computer, acceptor);
+            if (job != null) {
+                return job;
             }
         }
         return null;
+    }
+
+    private List<Job> findComputerAllRunBuilds(Computer computer, JobAcceptor acceptor) {
+        List<Job> result = new ArrayList<Job>();
+        List<Executor> executors = computer.getExecutors();
+        executors.addAll(computer.getOneOffExecutors());
+        for (Executor executor : executors) {
+            Job job = checkExecutorForRunBuild(executor, acceptor);
+            if (job != null) {
+                result.add(job);
+            }
+        }
+        return result;
     }
 
     private Job findComputerRunBuild(Computer computer, JobAcceptor acceptor) {
         List<Executor> executors = computer.getExecutors();
         executors.addAll(computer.getOneOffExecutors());
         for (Executor executor : executors) {
-            Job task = checkExecutorForRunBuild(executor, acceptor);
-            if (task != null) {
-                return task;
+            Job job = checkExecutorForRunBuild(executor, acceptor);
+            if (job != null) {
+                return job;
             }
         }
         return null;
@@ -83,18 +146,18 @@ public class JobFinder {
 
     private Job checkExecutorForRunBuild(Executor executor, JobAcceptor acceptor) {
         if (executor.isBusy()) {
-            Queue.Task task = executor.getCurrentWorkUnit().work.getOwnerTask();
-            if (task instanceof MatrixConfiguration) {
-                task = ((MatrixConfiguration) task).getParent();
+            Queue.Task job = executor.getCurrentWorkUnit().work.getOwnerTask();
+            if (job instanceof MatrixConfiguration) {
+                job = ((MatrixConfiguration) job).getParent();
             }
-            if (task instanceof Job) {
-                Job job = (Job) task;
+            if (job instanceof Job) {
+                Job project = (Job) job;
                 if (acceptor != null) {
-                    if (acceptor.accept(job)) {
-                        return job;
+                    if (acceptor.accept(project)) {
+                        return project;
                     }
                 } else {
-                    return job;
+                    return project;
                 }
             }
         }

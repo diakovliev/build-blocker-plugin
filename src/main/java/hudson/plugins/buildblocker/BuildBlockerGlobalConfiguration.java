@@ -80,6 +80,7 @@ public class BuildBlockerGlobalConfiguration extends GlobalConfiguration {
     }
 
     public boolean isMaintenanceJob(final String jobNameToTest) {
+        if (jobNameToTest == null) return false;
         return jobNameToTest.matches(maintenanceJobName);
     }
 }

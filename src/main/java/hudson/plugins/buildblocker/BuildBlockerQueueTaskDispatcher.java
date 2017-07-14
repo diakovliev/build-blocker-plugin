@@ -107,13 +107,9 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
 
     @Override
     public CauseOfBlockage canTake(Node node, Queue.BuildableItem item) {
-        CauseOfBlockage causeOfBlockage = checkForMaintenanceBlock(node, item);
-        if (causeOfBlockage != null) {
-            return causeOfBlockage;
-        }
         BuildBlockerProperty property = getBuildBlockerProperty(item);
         if (property != null) {
-            causeOfBlockage = checkForBlock(node, item, property);
+            CauseOfBlockage causeOfBlockage = checkForBlock(node, item, property);
             if (causeOfBlockage != null) {
                 return causeOfBlockage;
             }
@@ -122,10 +118,6 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
     }
 
     private CauseOfBlockage checkForMaintenanceBlock(Queue.Item item) {
-        return checkForMaintenanceBlock(null, item);
-    }
-
-    private CauseOfBlockage checkForMaintenanceBlock(Node node, Queue.Item item) {
         BuildBlockerGlobalConfiguration globalConfig = BuildBlockerGlobalConfiguration.get();
         if (globalConfig != null && globalConfig.isMaintenanceJobEnabled() && item.task != null && item.task instanceof Job) {
             MaintenanceBlockingJobMonitor jobsMonitor = new MaintenanceBlockingJobMonitor();
@@ -134,34 +126,44 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
                 // Allow to run matrix configuration if parent build run
                 Job parent = ((MatrixConfiguration)job).getParent();
                 if (parent.isBuilding()) {
-                    LOG.info(String.format("MatrixConfiguration detected, allow job: %s parent: %s", job.getFullName(), parent.getFullName()));
+                    LOG.info(String.format("Allow matrix configuration %s parent %s", job.getFullName(), parent.getFullName()));
                     return null;
                 }
+            } else {
+                LOG.info(String.format("%s is not a matrix configuration", job.getFullName()));
+            }
+            // Allow parts of runned multijobs
+            if (jobsMonitor.isPartOfRunnedMultijob(job)) {
+                LOG.info(String.format("Allow %s as it a part of run multijob", job.getFullName()));
+                return null;
+            } else {
+                LOG.info(String.format("%s is not a part of run multijob", job.getFullName()));
             }
             Job result;
-            if (job.getFullName() != null && globalConfig.isMaintenanceJob(job.getFullName())) {
+            if (globalConfig.isMaintenanceJob(job.getFullName())) {
+                LOG.info(String.format("Maintenance %s job", job.getFullName()));
                 // Another run of maintenance job will block maintenance
                 result = jobsMonitor.checkForRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {
                     LOG.info(String.format("Maintenance %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
                 } else {
+                    LOG.info(String.format("%s no any other run of mainenance jobs", job.getFullName()));
                     // Maintenance job can run only if there are no any run builds
                     result = jobsMonitor.checkForAnyRunnedBuild();
                     if (result != null) {
                         LOG.info(String.format("Maintenance %s blocked by %s", job.getFullName(), result.getFullName()));
+                    } else {
+                        LOG.info(String.format("%s no any other run jobs", job.getFullName()));
                     }
                 }
             } else {
-                // If any multijob is runned, we can't do maintenance block
-                result = jobsMonitor.checkForAnyRunnedMultijob();
-                if (result != null) {
-                    LOG.info(String.format("Run Multijob %s is detected, do not do maintenance block", result.getFullName()));
-                    return null;
-                }
+                LOG.info(String.format("Regular %s job", job.getFullName()));
                 // All other jobs will be run only if there are no scheduled/run maintenance builds
                 result = jobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {
                     LOG.info(String.format("Regular %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
+                } else {
+                    LOG.info(String.format("%s no any planned or run maintenance job", job.getFullName()));
                 }
             }
             if (result != null) {
