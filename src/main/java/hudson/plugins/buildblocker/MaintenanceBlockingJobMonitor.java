@@ -46,7 +46,7 @@ public class MaintenanceBlockingJobMonitor {
         return jobFinder.findFirstRunBuild(new JobFinder.JobAcceptor() {
             @Override
             public boolean accept(Job job) {
-                LOG.info(String.format("checkForRunnedMaintenanceBuild: Check %s for matching %s", job.getFullName(), config.getMaintenanceJobName()));
+                LOG.fine(String.format("checkForRunnedMaintenanceBuild: Check %s for matching %s", job.getFullName(), config.getMaintenanceJobName()));
                 return config.isMaintenanceJob(job.getFullName());
             }
         });
@@ -56,7 +56,7 @@ public class MaintenanceBlockingJobMonitor {
         return jobFinder.findFirstPlannedBuild(new JobFinder.JobAcceptor() {
             @Override
             public boolean accept(Job job) {
-                LOG.info(String.format("checkForPlannedMaintenanceBuild: Check %s for matching %s", job.getFullName(), config.getMaintenanceJobName()));
+                LOG.fine(String.format("checkForPlannedMaintenanceBuild: Check %s for matching %s", job.getFullName(), config.getMaintenanceJobName()));
                 return config.isMaintenanceJob(job.getFullName());
             }
         });
@@ -65,15 +65,15 @@ public class MaintenanceBlockingJobMonitor {
     public Job checkForPlannedOrRunnedMaintenanceBuild(final BuildBlockerGlobalConfiguration config) {
         Job result = checkForPlannedMaintenanceBuild(config);
         if (result == null) {
-            LOG.info(String.format("No planned build for regexp %s", config.getMaintenanceJobName()));
+            LOG.fine(String.format("No planned maintenance build for regexp %s", config.getMaintenanceJobName()));
             result = checkForRunnedMaintenanceBuild(config);
             if (result != null) {
-                LOG.info(String.format("Found run build %s", result.getFullName()));
+                LOG.fine(String.format("Found run maintenance build %s", result.getFullName()));
             } else {
-                LOG.info(String.format("No run build for regexp %s", config.getMaintenanceJobName()));
+                LOG.fine(String.format("No run maintenance build for regexp %s", config.getMaintenanceJobName()));
             }
         } else {
-            LOG.info(String.format("Found planned build %s", result.getFullName()));
+            LOG.fine(String.format("Found planned maintenance build %s", result.getFullName()));
         }
         return result;
     }

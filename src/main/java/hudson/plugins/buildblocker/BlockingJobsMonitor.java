@@ -2,7 +2,6 @@
  * The MIT License
  *
  * Copyright (c) 2004-2011, Sun Microsystems, Inc., Frederik Fromm
- * Copyright (C) 2017 Zodiac Interactive, LCC, Dmytro Iakovliev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -57,6 +56,7 @@ public class BlockingJobsMonitor {
     private List<String> blockingJobs = emptyList();
 
     private static final Logger LOG = Logger.getLogger(BlockingJobsMonitor.class.getName());
+
 
     /**
      * Constructor using the job configuration entry for blocking jobs

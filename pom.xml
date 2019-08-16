@@ -35,7 +35,7 @@
 
     <artifactId>build-blocker-plugin</artifactId>
     <name>Build Blocker Plugin</name>
-    <version>1.7.4.3-zodiac</version>
+    <version>1.7.4.4-zodiac</version>
     <packaging>hpi</packaging>
     <url>https://wiki.jenkins-ci.org/display/JENKINS/Build+Blocker+Plugin</url>
 
