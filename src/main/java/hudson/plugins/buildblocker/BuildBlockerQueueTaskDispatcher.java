@@ -126,54 +126,54 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
                 // Allow to run matrix configuration if parent build run
                 Job parent = ((MatrixConfiguration)job).getParent();
                 if (parent.isBuilding()) {
-                    LOG.info(String.format("Allow matrix configuration %s parent %s", job.getFullName(), parent.getFullName()));
+                    LOG.fine(String.format("Allow matrix configuration %s parent %s", job.getFullName(), parent.getFullName()));
                     return null;
                 }
             } else {
-                LOG.info(String.format("%s is not a matrix configuration", job.getFullName()));
+                LOG.fine(String.format("%s is not a matrix configuration", job.getFullName()));
             }
             // Allow parts of runned multijobs
             if (jobsMonitor.isPartOfRunnedMultijob(job)) {
-                LOG.info(String.format("Allow %s as it a part of run multijob", job.getFullName()));
+                LOG.fine(String.format("Allow %s as it is a part of run multijob", job.getFullName()));
                 return null;
             } else {
-                LOG.info(String.format("%s is not a part of run multijob", job.getFullName()));
+                LOG.fine(String.format("%s is not a part of run multijob", job.getFullName()));
             }
             Job result;
             if (globalConfig.isMaintenanceJob(job.getFullName())) {
-                LOG.info(String.format("Maintenance %s job", job.getFullName()));
+                LOG.fine(String.format("Maintenance job %s", job.getFullName()));
                 // Another run of maintenance job will block maintenance
                 result = jobsMonitor.checkForRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {
-                    LOG.info(String.format("Maintenance %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
+                    LOG.warning(String.format("Maintenance job %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
                 } else {
-                    LOG.info(String.format("%s no any other run of mainenance jobs", job.getFullName()));
+                    LOG.fine(String.format("There are no any other run %s job", job.getFullName()));
                     // Maintenance job can run only if there are no any run builds
                     result = jobsMonitor.checkForAnyRunnedBuild();
                     if (result != null) {
-                        LOG.info(String.format("Maintenance %s blocked by %s", job.getFullName(), result.getFullName()));
+                        LOG.warning(String.format("Maintenance job %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
                     } else {
-                        LOG.info(String.format("%s no any other run jobs", job.getFullName()));
+                        LOG.fine(String.format("There are no any other run %s job", job.getFullName()));
                     }
                 }
             } else {
-                LOG.info(String.format("Regular %s job", job.getFullName()));
+                LOG.fine(String.format("Regular job %s", job.getFullName()));
                 // All other jobs will be run only if there are no scheduled/run maintenance builds
                 result = jobsMonitor.checkForPlannedOrRunnedMaintenanceBuild(globalConfig);
                 if (result != null) {
-                    LOG.info(String.format("Regular %s blocked by maintenance %s", job.getFullName(), result.getFullName()));
+                    LOG.warning(String.format("Regular job %s is blocked by maintenance %s", job.getFullName(), result.getFullName()));
                 } else {
-                    LOG.info(String.format("%s no any planned or run maintenance job", job.getFullName()));
+                    LOG.fine(String.format("%s no any planned or run maintenance job", job.getFullName()));
                 }
             }
             if (result != null) {
                 if (result instanceof MatrixConfiguration) {
                     result = ((MatrixConfiguration) result).getParent();
                 }
-                LOG.info(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()).toString());
+                LOG.fine(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()).toString());
                 return CauseOfBlockage.fromMessage(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()));
             }
-            LOG.info(String.format("Allow %s", job.getFullName()));
+            LOG.fine(String.format("Allow %s", job.getFullName()));
         }
         return null;
     }
@@ -194,7 +194,7 @@ public class BuildBlockerQueueTaskDispatcher extends QueueTaskDispatcher {
             if (result instanceof MatrixConfiguration) {
                 result = ((MatrixConfiguration) result).getParent();
             }
-            LOG.info(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()).toString());
+            LOG.fine(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()).toString());
             return CauseOfBlockage.fromMessage(Messages._BlockingJobIsRunning(item.getInQueueForString(), result.getDisplayName()));
         }
         return null;

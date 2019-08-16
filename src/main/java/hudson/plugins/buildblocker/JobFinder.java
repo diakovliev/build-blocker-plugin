@@ -45,52 +45,26 @@ public class JobFinder {
         boolean accept(Job job);
     }
 
-    public List<Job> findAllPlannedBuilds(JobAcceptor acceptor) {
-        List<Job> result = new ArrayList<Job>();
-        List<? extends Queue.Item> buildableItems = asList(Jenkins.getInstance().getQueue().getItems());
-        for (Queue.Item buildableItem : buildableItems) {
-            if (buildableItem.task instanceof Job) {
-                LOG.info("Queue item task is Job");
-                Job job = (Job) buildableItem.task;
-                if (acceptor != null) {
-                    LOG.info("Acceptor found");
-                    if (acceptor.accept(job)) {
-                        LOG.info(String.format("Accept %s", job.getDisplayName()));
-                        result.add(job);
-                    } else {
-                        LOG.info(String.format("Not accepted %s", job.getDisplayName()));
-                    }
-                } else {
-                    LOG.info(String.format("No acceptor, accept %s", job.getDisplayName()));
-                    result.add(job);
-                }
-            } else {
-                LOG.info(String.format("Queue item task is not Job. %s", buildableItem.getDisplayName()));
-            }
-        }
-        return result;
-    }
-
     public Job findFirstPlannedBuild(JobAcceptor acceptor) {
         List<? extends Queue.Item> buildableItems = asList(Jenkins.getInstance().getQueue().getItems());
         for (Queue.Item buildableItem : buildableItems) {
             if (buildableItem.task instanceof Job) {
-                LOG.info("Queue item task is Job");
+                LOG.fine("Queue item is a job");
                 Job job = (Job) buildableItem.task;
                 if (acceptor != null) {
-                    LOG.info("Acceptor found");
+                    LOG.fine("Acceptor found");
                     if (acceptor.accept(job)) {
-                        LOG.info(String.format("Accept %s", job.getDisplayName()));
+                        LOG.fine(String.format("Accept %s", job.getDisplayName()));
                         return job;
                     } else {
-                        LOG.info(String.format("Not accepted %s", job.getDisplayName()));
+                        LOG.fine(String.format("Not accepted %s", job.getDisplayName()));
                     }
                 } else {
-                    LOG.info(String.format("No acceptor, accept %s", job.getDisplayName()));
+                    LOG.fine(String.format("No acceptor, accept %s", job.getDisplayName()));
                     return job;
                 }
             } else {
-                LOG.info(String.format("Queue item task is not Job. %s", buildableItem.getDisplayName()));
+                LOG.fine(String.format("Queue item task is not Job. %s", buildableItem.getDisplayName()));
             }
         }
         return null;
